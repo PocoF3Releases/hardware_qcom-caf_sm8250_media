@@ -120,23 +120,17 @@ C2DColorConverter::~C2DColorConverter()
         }
 
         if (mSrcSurfaceDef) {
-            if (isYUVSurface(mSrcFormat)) {
-                delete ((C2D_YUV_SURFACE_DEF *)mSrcSurfaceDef);
-            } else {
-                delete ((C2D_RGB_SURFACE_DEF *)mSrcSurfaceDef);
-            }
+            free(mSrcSurfaceDef);
         }
 
         if (mDstSurfaceDef) {
-            if (isYUVSurface(mDstFormat)) {
-                delete ((C2D_YUV_SURFACE_DEF *)mDstSurfaceDef);
-            } else {
-                delete ((C2D_RGB_SURFACE_DEF *)mDstSurfaceDef);
-            }
+            free(mDstSurfaceDef);
         }
         mSrcSurfaceDef = NULL;
         mDstSurfaceDef = NULL;
     }
+
+    pthread_mutex_destroy(&mLock);
 
     if (mC2DLibHandle) {
         dlclose(mC2DLibHandle);
@@ -288,26 +282,23 @@ bool C2DColorConverter::convertC2D(int srcFd, void *srcBase, void * srcData,
 
           mBlit.surface_id = mSrcSurface;
           ret = mC2DDraw(mDstSurface, mRotation, 0, 0, 0, &mBlit, 1);
-          mC2DFinish(mDstSurface);
+          // Attempt to drain even a failed draw before releasing its mappings.
+          C2D_STATUS finish_ret = mC2DFinish(mDstSurface);
+          bool unmappedSrcSuccess = unmapGPUAddr((unsigned long)srcMappedGpuAddr);
+          bool unmappedDstSuccess = unmapGPUAddr((unsigned long)dstMappedGpuAddr);
 
-          if (ret == C2D_STATUS_OK) {
-            bool unmappedSrcSuccess;
-            unmappedSrcSuccess = unmapGPUAddr((unsigned long)srcMappedGpuAddr);
-
-            bool unmappedDstSuccess;
-            unmappedDstSuccess = unmapGPUAddr((unsigned long)dstMappedGpuAddr);
-
-            if (!unmappedSrcSuccess || !unmappedDstSuccess) {
-              ALOGE("%s: unmapping GPU address failed (%d:%d)", __FUNCTION__,
-                    unmappedSrcSuccess, unmappedDstSuccess);
-              status = false;
-            } else {
-              status = true;
-            }
-          } else {
+          if (ret != C2D_STATUS_OK) {
             ALOGE("%s: C2D Draw failed (%d)", __FUNCTION__, ret);
-            status = false;
           }
+          if (finish_ret != C2D_STATUS_OK) {
+            ALOGE("%s: C2D Finish failed (%d)", __FUNCTION__, finish_ret);
+          }
+          if (!unmappedSrcSuccess || !unmappedDstSuccess) {
+            ALOGE("%s: unmapping GPU address failed (%d:%d)", __FUNCTION__,
+                  unmappedSrcSuccess, unmappedDstSuccess);
+          }
+          status = ret == C2D_STATUS_OK && finish_ret == C2D_STATUS_OK &&
+                   unmappedSrcSuccess && unmappedDstSuccess;
         } else {
           ALOGE("%s: Update dst surface def failed (%d)", __FUNCTION__, ret);
           unmapGPUAddr((unsigned long)srcMappedGpuAddr);
@@ -355,11 +346,7 @@ void C2DColorConverter::ClearSurfaces()
         }
 
          if (mSrcSurfaceDef) {
-            if (isYUVSurface(mSrcFormat)) {
-                delete ((C2D_YUV_SURFACE_DEF *)mSrcSurfaceDef);
-            } else {
-                delete ((C2D_RGB_SURFACE_DEF *)mSrcSurfaceDef);
-            }
+            free(mSrcSurfaceDef);
             mSrcSurfaceDef = NULL;
         }
 
@@ -369,11 +356,7 @@ void C2DColorConverter::ClearSurfaces()
         }
 
         if (mDstSurfaceDef) {
-            if (isYUVSurface(mDstFormat)) {
-                delete ((C2D_YUV_SURFACE_DEF *)mDstSurfaceDef);
-            } else {
-                delete ((C2D_RGB_SURFACE_DEF *)mDstSurfaceDef);
-            }
+            free(mDstSurfaceDef);
             mDstSurfaceDef = NULL;
         }
 }
