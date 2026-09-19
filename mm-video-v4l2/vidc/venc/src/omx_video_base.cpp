@@ -5302,7 +5302,7 @@ OMX_ERRORTYPE  omx_video::empty_this_buffer_opaque(OMX_IN OMX_HANDLETYPE hComp,
                                 m_sInPortDef.format.video.nFrameWidth,
                                 m_sInPortDef.format.video.nFrameHeight,
                                 c2dSrcFmt, c2dDestFmt,
-                                handle->flags, handle->width)) {
+                                handle->flags | full_range_flag, handle->width)) {
             DEBUG_PRINT_HIGH("C2D setRotation - %u", m_sConfigFrameRotation.nRotation);
             if (m_no_vpss && is_rotation_enabled()) {
                 c2dcc.setRotation(m_sConfigFrameRotation.nRotation);

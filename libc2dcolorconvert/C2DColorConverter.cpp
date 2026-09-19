@@ -57,6 +57,7 @@ C2DColorConverter::C2DColorConverter()
     mDstSurfaceDef = NULL;
 
     mConversionNeeded = false;
+    mFlags = 0;
 
     pthread_mutex_init(&mLock, NULL);
 
@@ -155,8 +156,9 @@ bool C2DColorConverter::isPropChanged(size_t srcWidth, size_t srcHeight, size_t 
             mSrcFormat != srcFormat  ||
             mDstFormat != dstFormat  ||
             mSrcStride != srcStride  ||
-            (mFlags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED)  !=
-                      (flags  & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED));
+            ((mFlags ^ flags) & (private_handle_t::PRIV_FLAGS_UBWC_ALIGNED |
+                                  private_handle_t::PRIV_FLAGS_UBWC_ALIGNED_PI |
+                                  private_handle_t::PRIV_FLAGS_ITU_R_601_FR)) != 0);
 }
 
 bool C2DColorConverter::setResolution(size_t srcWidth, size_t srcHeight,
